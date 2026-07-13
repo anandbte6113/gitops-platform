@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - projects/dev-project.yaml
+  - projects/staging-project.yaml
+  - rbac/argocd-rbac-cm.yaml
+  - controllers/sealed-secrets.yaml
+  - controllers/eso.yaml
+  - secret-stores/cluster-secret-store.yaml
+  - applicationsets/microservices-appset.yaml

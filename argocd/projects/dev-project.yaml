@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Dev environment project
+  sourceRepos:
+    - https://github.com/anandbte6113/gitops-platform.git
+    - https://charts.helm.sh/stable
+  destinations:
+    - server: https://172.19.0.3:6443
+      namespace: '*'
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

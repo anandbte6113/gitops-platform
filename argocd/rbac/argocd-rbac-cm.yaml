@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+data:
+  policy.default: role:readonly
+  policy.csv: |
+    # Dev team — full access to dev project only
+    p, role:dev-team, applications, *, dev/*, allow
+    p, role:dev-team, applications, sync, dev/*, allow
+
+    # Staging team — sync access to staging project only
+    p, role:staging-team, applications, get, staging/*, allow
+    p, role:staging-team, applications, sync, staging/*, allow
+
+    # Admins — full access everywhere
+    p, role:admin, applications, *, */*, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:admin, projects, *, *, allow
+
+    g, admin, role:admin

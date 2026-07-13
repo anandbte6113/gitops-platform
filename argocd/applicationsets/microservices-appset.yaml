@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: microservices
+  namespace: argocd
+spec:
+  generators:
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://github.com/anandbte6113/gitops-platform.git
+              revision: HEAD
+              directories:
+                - path: services/*
+          - list:
+              elements:
+                - cluster: dev-cluster
+                  server: https://172.19.0.3:6443
+                  env: dev
+                  project: dev
+                  autoSync: "true"
+                - cluster: staging-cluster
+                  server: https://172.19.0.4:6443
+                  env: staging
+                  project: staging
+                  autoSync: "false"
+  template:
+    metadata:
+      name: '{{path.basename}}-{{env}}'
+    spec:
+      project: '{{project}}'
+      source:
+        repoURL: https://github.com/anandbte6113/gitops-platform.git
+        targetRevision: HEAD
+        path: 'services/{{path.basename}}/overlays/{{env}}'
+      destination:
+        server: '{{server}}'
+        namespace: '{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: '{{autoSync}}'
+          selfHeal: '{{autoSync}}'
+        syncOptions:
+          - CreateNamespace=true
