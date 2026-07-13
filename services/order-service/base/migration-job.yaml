@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: order-service-migration
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migration
+          image: postgres:15
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Running DB migration..."
+              PGPASSWORD=$DB_PASSWORD psql \
+                -h $DB_HOST \
+                -U $DB_USER \
+                -d $DB_NAME \
+                -c "CREATE TABLE IF NOT EXISTS orders (
+                      id SERIAL PRIMARY KEY,
+                      user_id INT NOT NULL,
+                      amount DECIMAL(10,2) NOT NULL,
+                      created_at TIMESTAMP DEFAULT NOW()
+                    );"
+              echo "Migration complete."
+          env:
+            - name: DB_HOST
+              value: order-service
+            - name: DB_NAME
+              value: orders
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: order-service-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: order-service-db-secret
+                  key: password
