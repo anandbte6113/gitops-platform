@@ -462,6 +462,54 @@ ArgoCD pod:      172.19.0.x:6443  →  Docker bridge  →  dev-cluster container
 
 ---
 
+### Problem 3 — ClusterSecretStore CRD not found (ordering issue)
+**Phase:** Phase 2 — App-of-Apps bootstrap
+
+**What happened:**
+root-app synced the `argocd/` directory but failed with:
+```
+The Kubernetes API could not find external-secrets.io/ClusterSecretStore for requested resource.
+Make sure the "ClusterSecretStore" CRD is installed on the destination cluster.
+```
+
+**Why it happened:**
+ArgoCD applies all resources in a directory at once by default. The `ClusterSecretStore` CRD comes from the ESO Helm chart — but ESO itself was being installed in the same sync wave. The CRD didn't exist yet when ArgoCD tried to apply `cluster-secret-store.yaml`.
+
+**Fix: Sync Waves**
+Added `argocd.argoproj.io/sync-wave` annotations to enforce ordering:
+- Wave 1: ESO controller + Sealed Secrets controller (installs CRDs)
+- Wave 2: AppProjects, RBAC, ApplicationSets
+- Wave 3: ClusterSecretStore (CRDs guaranteed to exist by now)
+
+Also added `argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true` to ClusterSecretStore as a safety net — tells ArgoCD to skip the dry-run validation if the CRD is still missing, and retry instead of hard-failing.
+
+**Lesson:** Any resource that depends on a CRD must be in a higher sync wave than the Application that installs that CRD. This is the standard pattern for bootstrapping controllers + their CRs in one repo.
+
+---
+
+### Problem 4 — ApplicationSet rejected: boolean fields passed as strings
+**Phase:** Phase 2 — App-of-Apps bootstrap
+
+**What happened:**
+```
+ApplicationSet.argoproj.io "microservices" is invalid:
+spec.template.spec.syncPolicy.automated.prune: Invalid value: "string": must be of type boolean
+spec.template.spec.syncPolicy.automated.selfHeal: Invalid value: "string": must be of type boolean
+```
+
+**Why it happened:**
+The original ApplicationSet used a Matrix generator with a list element `autoSync: "true"` and then referenced it in the template as `'{{autoSync}}'`. Template variables are always substituted as strings. But `prune` and `selfHeal` fields in the Kubernetes API are strict booleans — `"true"` (string) is rejected, `true` (boolean) is required.
+
+**Fix: Split into two ApplicationSets**
+- `microservices-dev` — hardcodes `automated: prune: true, selfHeal: true`
+- `microservices-staging` — omits `automated` entirely (manual sync only)
+
+This is actually more readable and closer to what real enterprise setups do. The Matrix generator approach with boolean templating is a known limitation of ArgoCD ApplicationSets.
+
+**Lesson:** Never template boolean fields in ApplicationSet templates. For different sync behaviors per environment, use separate ApplicationSets rather than trying to parameterize booleans through a generator list.
+
+---
+
 ## 12. Interview Prep — Q&A
 
 ### Q: What is GitOps?
