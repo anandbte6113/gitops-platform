@@ -22,7 +22,10 @@ docker run -d \
   --name localstack \
   --network kind \
   -p 4566:4566 \
-  -e SERVICES=secretsmanager \
+  -e SERVICES=secretsmanager,sts \
+  -e AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
+  -e AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
+  -e AWS_DEFAULT_REGION=us-east-1 \
   localstack/localstack:3.0
 
 echo "==> Waiting for LocalStack to be healthy..."
@@ -66,10 +69,11 @@ kill $PF_PID 2>/dev/null || true
 
 echo "==> Creating aws-credentials secrets on all clusters..."
 for CONTEXT in kind-management-cluster kind-dev-cluster kind-staging-cluster; do
+  kubectl create namespace external-secrets --context "$CONTEXT" 2>/dev/null || true
   kubectl create secret generic aws-credentials \
     --namespace external-secrets \
-    --from-literal=access-key=test \
-    --from-literal=secret-key=test \
+    --from-literal=access-key=AKIAIOSFODNN7EXAMPLE \
+    --from-literal=secret-key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
     --context "$CONTEXT" \
     --dry-run=client -o yaml | kubectl apply --context "$CONTEXT" -f - 2>/dev/null || true
 done
