@@ -15,11 +15,11 @@
 | 8 | Phase 5 — order-service | 277–281 | ~281 | Steps, commands, notes |
 | 9 | Phase 6 — Sync Policies | 283–287 | ~287 | Steps, commands, notes |
 | 10 | Phase 7 — Documentation Files | 289–293 | ~293 | Steps, commands, notes |
-| 11 | Problems Encountered & Fixes | 295–395 | ~395 | Problem / Why / Fix / Lesson |
-| 12 | Interview Prep — Q&A | 397–500 | ~500 | Q: ... A: ... blocks |
-| 13 | Setup Guide — Run on Any Machine | 502–548 | ~548 | Prerequisites + setup steps |
+| 11 | Problems Encountered & Fixes | 363–569 | ~569 | Problem / Why / Fix / Lesson |
+| 12 | Interview Prep — Q&A | 571–674 | ~674 | Q: ... A: ... blocks |
+| 13 | Setup Guide — Run on Any Machine | 676–722 | ~722 | Prerequisites + setup steps |
 
-**Total lines: 548**
+**Total lines: 722**
 
 ---
 

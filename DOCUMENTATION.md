@@ -510,6 +510,51 @@ This is actually more readable and closer to what real enterprise setups do. The
 
 ---
 
+### Problem 5 — ClusterSecretStore cannot reach LocalStack via hostname
+**Phase:** Phase 2 — App-of-Apps bootstrap
+
+**What happened:**
+ClusterSecretStore showed `InvalidProviderConfig` with:
+```
+unable to create session: could not fetch SecretAccessKey secret: cannot get Kubernetes secret "aws-credentials": secrets "aws-credentials" not found
+```
+After creating the `aws-credentials` secret, it then failed with:
+```
+unable to create client
+```
+The endpoint `http://localstack:4566` was not reachable from inside the pod.
+
+**Why it happened (two separate issues):**
+
+Issue A — Missing `aws-credentials` secret:
+ESO requires a Kubernetes Secret with AWS access key + secret key to authenticate, even against LocalStack which accepts any credentials. This secret can't be in Git (it's a secret), so it must be created manually after cluster setup.
+```bash
+kubectl create secret generic aws-credentials \
+  --namespace external-secrets \
+  --from-literal=access-key=test \
+  --from-literal=secret-key=test
+```
+
+Issue B — Hostname `localstack` not resolvable from pods:
+Docker container names are resolvable within the Docker bridge network from other containers. But Kubernetes pod DNS only resolves Kubernetes Service names — it has no awareness of Docker container names. So `http://localstack:4566` works from the host terminal but not from inside a pod.
+
+**Fix:** Use the LocalStack container's Docker bridge IP:
+```bash
+docker inspect localstack --format '{{ .NetworkSettings.Networks.kind.IPAddress }}'
+# → 172.19.0.5
+```
+Updated `cluster-secret-store.yaml` endpoint to `http://172.19.0.5:4566`.
+
+**Lesson:** When connecting from Kubernetes pods to Docker containers (not K8s services), always use the Docker bridge IP, never the container hostname. Add this IP to the bootstrap script so it's computed automatically on each setup.
+
+**Final verified state after fix:**
+```
+NAME                      STATUS   CAPABILITIES   READY
+localstack-secret-store   Valid    ReadWrite      True
+```
+
+---
+
 ## 12. Interview Prep — Q&A
 
 ### Q: What is GitOps?
