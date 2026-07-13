@@ -16,10 +16,13 @@
 | 9 | Phase 6 — Sync Policies | 283–287 | ~287 | Steps, commands, notes |
 | 10 | Phase 7 — Documentation Files | 289–293 | ~293 | Steps, commands, notes |
 | 11 | Problems Encountered & Fixes | 363–569 | ~569 | Problem / Why / Fix / Lesson |
+| 11a | Problem 6: ESO endpoint CRD mismatch | 711–745 | ~745 | ESO fake provider fix |
+| 11b | Problem 7: SelfHeal overwrites patches | 747–760 | ~760 | Always push to Git first |
+| 11c | Final Platform Status 2026-07-14 | 762–790 | ~790 | Status table |
 | 12 | Interview Prep — Q&A | 571–674 | ~674 | Q: ... A: ... blocks |
-| 13 | Setup Guide — Run on Any Machine | 676–722 | ~722 | Prerequisites + setup steps |
+| 13 | Setup Guide — Run on Any Machine | 676–709 | ~709 | Prerequisites + setup steps |
 
-**Total lines: 722**
+**Total lines: ~790**
 
 ---
 

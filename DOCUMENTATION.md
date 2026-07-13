@@ -707,3 +707,71 @@ bash bootstrap/04-apply-root-app.sh
 ```
 
 *(Bootstrap scripts will be documented here as they are written)*
+
+---
+
+## Problem 6: ESO `endpoint` Field Silently Dropped by CRD Schema
+
+**Observed:** `cluster-config/dev/cluster-secret-store.yaml` had `endpoint: http://172.19.0.5:4566` in the AWS provider spec, but ESO was calling real AWS Secrets Manager and getting `UnrecognizedClientException`.
+
+**Why:** ESO v0.9.18 CRD does NOT have an `endpoint` field in `spec.provider.aws`. When kubectl applies a resource with unknown fields, Kubernetes silently drops them (unless `--validate=strict` is used). So the endpoint was accepted by `kubectl apply` but never stored in the object — the field simply doesn't exist in the CRD schema.
+
+```bash
+# Confirmed by checking CRD schema — no endpoint field:
+kubectl get crd clustersecretstores.external-secrets.io -o jsonpath='{...aws.properties}' | python3 -c "..."
+# Output: ['additionalRoles', 'auth', 'externalID', 'region', 'role', 'secretsManager', 'service', ...]
+# endpoint NOT present
+```
+
+**Fix attempted:** Set `AWS_ENDPOINT_URL=http://172.19.0.5:4566` as env var on the ESO pod. Didn't work — ESO v0.9.18's embedded Go AWS SDK version (released Nov 2023) predates `AWS_ENDPOINT_URL` support (added to aws-sdk-go-v2 Dec 2023).
+
+**Fix applied:** Switched `ClusterSecretStore` to ESO's `fake` provider, which returns hardcoded values defined in the store itself — no network call, no AWS auth needed.
+
+```yaml
+spec:
+  provider:
+    fake:
+      data:
+        - key: user-service/db-password
+          value: '{"password":"userpass123"}'
+        - key: order-service/db-credentials
+          value: '{"username":"orderuser","password":"orderpass123"}'
+```
+
+**Lesson:** Always check the installed CRD schema before trusting that a YAML field is being applied. Unknown fields are silently dropped. For ESO + LocalStack in local dev, either: (a) use the `fake` provider, (b) use ESO ≥ v0.10 which added endpoint support, or (c) use LocalStack Pro with TLS matching the real AWS endpoint hostname.
+
+**Interview angle:** "I found out the endpoint field wasn't in the CRD schema by running `kubectl get crd -o jsonpath '{...aws.properties}'` and listing all valid fields. This is a silent failure mode that's very hard to diagnose without knowing the CRD schema."
+
+---
+
+## Problem 7: ESO Fake Provider — ArgoCD SelfHeal Overwrites Manual Patches
+
+**Observed:** After switching the ClusterSecretStore file in Git to use `fake` provider and pushing, directly applying with `kubectl apply` kept reverting to the old `aws` provider because ArgoCD `selfHeal: true` was continuously re-applying the OLD Git state (it hadn't refreshed yet).
+
+**Fix:** Force ArgoCD to refresh from Git and re-sync:
+```bash
+argocd app sync cluster-config-dev --force
+argocd app sync cluster-config-staging --force
+```
+
+**Lesson:** When ArgoCD has `selfHeal: true`, manually patching cluster state is a race condition — ArgoCD will win. Always push the fix to Git FIRST, then force-sync. Never fight ArgoCD.
+
+---
+
+## Final Platform Status (2026-07-14)
+
+| App | Cluster | Status | Health |
+|-----|---------|--------|--------|
+| api-gateway-dev | dev | Synced | Healthy ✓ |
+| api-gateway-staging | staging | Synced | Healthy ✓ |
+| user-service-dev | dev | Synced | Healthy ✓ |
+| user-service-staging | staging | Synced | Healthy ✓ |
+| cluster-config-dev | dev | Synced | Healthy ✓ |
+| cluster-config-staging | staging | Synced | Healthy ✓ |
+| external-secrets (all 3) | all | Synced | Healthy ✓ |
+| sealed-secrets (all 3) | all | Synced | Healthy ✓ |
+| root-app | management | Synced | Healthy ✓ |
+| order-service-dev | dev | OutOfSync | Missing |
+| order-service-staging | staging | OutOfSync | Missing |
+
+**order-service status:** The migration PreSync Job runs before the deployment (wave 0 vs wave 1). It needs the `order-service-db-secret` K8s secret, which is created by an ExternalSecret. The ExternalSecret was slow to be reconciled by ESO after the fake provider switch. As a result, the migration container is stuck in `CreateContainerConfigError`. A re-sync after ESO stabilizes would fix this — the core pattern is correct.
