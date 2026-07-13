@@ -1,46 +1,62 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: microservices
+  name: microservices-dev
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
   generators:
-    - matrix:
-        generators:
-          - git:
-              repoURL: https://github.com/anandbte6113/gitops-platform.git
-              revision: HEAD
-              directories:
-                - path: services/*
-          - list:
-              elements:
-                - cluster: dev-cluster
-                  server: https://172.19.0.3:6443
-                  env: dev
-                  project: dev
-                  autoSync: "true"
-                - cluster: staging-cluster
-                  server: https://172.19.0.4:6443
-                  env: staging
-                  project: staging
-                  autoSync: "false"
+    - git:
+        repoURL: https://github.com/anandbte6113/gitops-platform.git
+        revision: HEAD
+        directories:
+          - path: services/*
   template:
     metadata:
-      name: '{{path.basename}}-{{env}}'
+      name: '{{path.basename}}-dev'
     spec:
-      project: '{{project}}'
+      project: dev
       source:
         repoURL: https://github.com/anandbte6113/gitops-platform.git
         targetRevision: HEAD
-        path: 'services/{{path.basename}}/overlays/{{env}}'
+        path: 'services/{{path.basename}}/overlays/dev'
       destination:
-        server: '{{server}}'
+        server: https://172.19.0.3:6443
         namespace: '{{path.basename}}'
       syncPolicy:
         automated:
-          prune: '{{autoSync}}'
-          selfHeal: '{{autoSync}}'
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: microservices-staging
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/anandbte6113/gitops-platform.git
+        revision: HEAD
+        directories:
+          - path: services/*
+  template:
+    metadata:
+      name: '{{path.basename}}-staging'
+    spec:
+      project: staging
+      source:
+        repoURL: https://github.com/anandbte6113/gitops-platform.git
+        targetRevision: HEAD
+        path: 'services/{{path.basename}}/overlays/staging'
+      destination:
+        server: https://172.19.0.4:6443
+        namespace: '{{path.basename}}'
+      syncPolicy:
         syncOptions:
           - CreateNamespace=true
